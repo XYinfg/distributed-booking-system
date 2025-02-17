@@ -2,7 +2,7 @@
 
 ## 1. Objective
 
-This project consolidates the basic knowledge of interprocess communication and remote invocation by requiring the design and implementation of a distributed facility booking system using UDP sockets. Through this project, students gain hands-on experience in constructing client and server programs that communicate using custom message formats, implement fault-tolerance measures, and compare different invocation semantics.
+This project consolidates the basic knowledge of interprocess communication and remote invocation by requiring the design and implementation of a distributed facility booking system using UDP sockets.
 
 ## 2. Introduction
 
