@@ -9,7 +9,7 @@
     #include <winsock2.h>
     #include <ws2tcpip.h>
     #pragma comment(lib, "Ws2_32.lib")
-    typedef char byte;
+    // Don't redefine byte - it's already defined in Windows headers
 #else
     #include <sys/socket.h>
     #include <netinet/in.h>

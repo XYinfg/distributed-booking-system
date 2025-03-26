@@ -7,6 +7,7 @@
 #include <random>
 #include <algorithm>
 #include <ctime>
+#include <sstream>  // Add missing include for stringstream
 #include "Protocol.h"
 #include "Marshaller.h"
 
@@ -16,7 +17,7 @@ class BookingClient {
 private:
     string serverAddress;
     int serverPort;
-    int clientSocket;
+    SOCKET clientSocket;  // Use SOCKET type for Windows
     struct sockaddr_in serverAddr;
     int requestCounter = 0;
     bool atLeastOnceSemanticsEnabled = false;
@@ -26,7 +27,7 @@ private:
         return ((double)rand() / RAND_MAX) < packetLossProbability;
     }
 
-    vector<byte> createRequest(const string& command, const vector<string>& args) {
+    vector<unsigned char> createRequest(const string& command, const vector<string>& args) {
         requestCounter++;
         int requestId = requestCounter;
 
@@ -45,16 +46,16 @@ private:
                 return createExtendBookingRequest(requestId, args);
             } else {
                 cout << "Unknown command." << endl;
-                return vector<byte>();
+                return vector<unsigned char>();
             }
         } catch (const exception& e) {
             cout << "Input error: " << e.what() << endl;
-            return vector<byte>();
+            return vector<unsigned char>();
         }
     }
 
-    vector<byte> sendRequest(const vector<byte>& request) {
-        if (request.empty()) return vector<byte>();
+    vector<unsigned char> sendRequest(const vector<unsigned char>& request) {
+        if (request.empty()) return vector<unsigned char>();
 
         try {
             if (atLeastOnceSemanticsEnabled) {
@@ -65,53 +66,72 @@ private:
             }
         } catch (const exception& e) {
             cerr << "Network error: " << e.what() << endl;
-            return vector<byte>();
+            return vector<unsigned char>();
         }
     }
 
-    vector<byte> sendAtMostOnce(const vector<byte>& request) {
+    vector<unsigned char> sendAtMostOnce(const vector<unsigned char>& request) {
         if (simulatePacketLoss()) {
             cout << "[SIMULATED PACKET LOSS - CLIENT SEND]" << endl;
-            return vector<byte>();
+            return vector<unsigned char>();
         }
 
         // Send the request
-        if (sendto(clientSocket, request.data(), request.size(), 0, 
+        if (sendto(clientSocket, (const char*)request.data(), request.size(), 0, 
                  (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
-            cerr << "Failed to send packet" << endl;
-            return vector<byte>();
+            cerr << "Failed to send packet: " << WSAGetLastError() << endl;
+            return vector<unsigned char>();
         }
 
         // Set timeout for receiving response
-        struct timeval tv;
-        tv.tv_sec = 5;  // 5 seconds timeout
-        tv.tv_usec = 0;
-        if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-            cerr << "Failed to set socket timeout" << endl;
-            return vector<byte>();
-        }
+        #ifdef _WIN32
+            // Windows uses different type for timeout
+            DWORD timeout = 5000;  // 5 seconds in milliseconds
+            if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0) {
+                cerr << "Failed to set socket timeout: " << WSAGetLastError() << endl;
+                return vector<unsigned char>();
+            }
+        #else
+            struct timeval tv;
+            tv.tv_sec = 5;  // 5 seconds timeout
+            tv.tv_usec = 0;
+            if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+                cerr << "Failed to set socket timeout" << endl;
+                return vector<unsigned char>();
+            }
+        #endif
 
         // Receive response
-        vector<byte> buffer(MAX_MESSAGE_SIZE);
+        vector<unsigned char> buffer(MAX_MESSAGE_SIZE);
         struct sockaddr_in from;
-        socklen_t fromlen = sizeof(from);
+        int fromlen = sizeof(from);
         
-        int received = recvfrom(clientSocket, buffer.data(), buffer.size(), 0, 
+        int received = recvfrom(clientSocket, (char*)buffer.data(), buffer.size(), 0, 
                              (struct sockaddr*)&from, &fromlen);
         
         if (received < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                cout << "Timeout waiting for server response (At-Most-Once). "
-                     << "Request might be lost or server is unavailable." << endl;
-            } else {
-                cerr << "Error receiving response: " << strerror(errno) << endl;
-            }
-            return vector<byte>();
+            #ifdef _WIN32
+                int error = WSAGetLastError();
+                if (error == WSAETIMEDOUT) {
+                    cout << "Timeout waiting for server response (At-Most-Once). "
+                         << "Request might be lost or server is unavailable." << endl;
+                } else {
+                    cerr << "Error receiving response: " << error << endl;
+                }
+            #else
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    cout << "Timeout waiting for server response (At-Most-Once). "
+                         << "Request might be lost or server is unavailable." << endl;
+                } else {
+                    cerr << "Error receiving response: " << strerror(errno) << endl;
+                }
+            #endif
+            return vector<unsigned char>();
         }
 
         if (simulatePacketLoss()) {
             cout << "[SIMULATED PACKET LOSS - CLIENT RECEIVE]" << endl;
-            return vector<byte>();
+            return vector<unsigned char>();
         }
 
         // Resize buffer to actual data received
@@ -119,7 +139,7 @@ private:
         return buffer;
     }
 
-    vector<byte> sendWithRetry(const vector<byte>& request, int requestId) {
+    vector<unsigned char> sendWithRetry(const vector<unsigned char>& request, int requestId) {
         int retries = 3;
         while (retries-- > 0) {
             if (simulatePacketLoss()) {
@@ -129,41 +149,65 @@ private:
             }
 
             // Send the request
-            if (sendto(clientSocket, request.data(), request.size(), 0, 
+            if (sendto(clientSocket, (const char*)request.data(), request.size(), 0, 
                      (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
-                cerr << "Failed to send packet" << endl;
+                cerr << "Failed to send packet: " << WSAGetLastError() << endl;
                 continue;
             }
 
             // Set timeout for receiving response
-            struct timeval tv;
-            tv.tv_sec = 2;  // 2 seconds timeout
-            tv.tv_usec = 0;
-            if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-                cerr << "Failed to set socket timeout" << endl;
-                continue;
-            }
+            #ifdef _WIN32
+                // Windows uses different type for timeout
+                DWORD timeout = 2000;  // 2 seconds in milliseconds
+                if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0) {
+                    cerr << "Failed to set socket timeout: " << WSAGetLastError() << endl;
+                    continue;
+                }
+            #else
+                struct timeval tv;
+                tv.tv_sec = 2;  // 2 seconds timeout
+                tv.tv_usec = 0;
+                if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+                    cerr << "Failed to set socket timeout" << endl;
+                    continue;
+                }
+            #endif
 
             // Receive response
-            vector<byte> buffer(MAX_MESSAGE_SIZE);
+            vector<unsigned char> buffer(MAX_MESSAGE_SIZE);
             struct sockaddr_in from;
-            socklen_t fromlen = sizeof(from);
+            int fromlen = sizeof(from);
             
-            int received = recvfrom(clientSocket, buffer.data(), buffer.size(), 0, 
+            int received = recvfrom(clientSocket, (char*)buffer.data(), buffer.size(), 0, 
                                  (struct sockaddr*)&from, &fromlen);
             
             if (received < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    cout << "Timeout for request ID: " << requestId << ", retry " 
-                         << (3 - retries) << "..." << endl;
-                    if (retries == 0) {
-                        cout << "Server unavailable after multiple retries (At-Least-Once)." << endl;
-                        return vector<byte>();
+                #ifdef _WIN32
+                    int error = WSAGetLastError();
+                    if (error == WSAETIMEDOUT) {
+                        cout << "Timeout for request ID: " << requestId << ", retry " 
+                             << (3 - retries) << "..." << endl;
+                        if (retries == 0) {
+                            cout << "Server unavailable after multiple retries (At-Least-Once)." << endl;
+                            return vector<unsigned char>();
+                        }
+                    } else {
+                        cerr << "Error receiving response: " << error << endl;
+                        continue;
                     }
-                } else {
-                    cerr << "Error receiving response: " << strerror(errno) << endl;
-                    continue;
-                }
+                #else
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        cout << "Timeout for request ID: " << requestId << ", retry " 
+                             << (3 - retries) << "..." << endl;
+                        if (retries == 0) {
+                            cout << "Server unavailable after multiple retries (At-Least-Once)." << endl;
+                            return vector<unsigned char>();
+                        }
+                    } else {
+                        cerr << "Error receiving response: " << strerror(errno) << endl;
+                        continue;
+                    }
+                #endif
             } else {
                 if (simulatePacketLoss()) {
                     cout << "[SIMULATED PACKET LOSS - CLIENT RECEIVE (Retry " 
@@ -176,10 +220,10 @@ private:
                 return buffer;
             }
         }
-        return vector<byte>();
+        return vector<unsigned char>();
     }
 
-    void processResponse(const vector<byte>& responseData) {
+    void processResponse(const vector<unsigned char>& responseData) {
         if (responseData.empty()) return;
 
         MessageHeader header = Marshaller::unmarshalHeader(responseData);
@@ -188,7 +232,7 @@ private:
 
         if (payloadLength > 0) {
             // Extract payload bytes
-            vector<byte> payload(responseData.begin() + 7, 
+            vector<unsigned char> payload(responseData.begin() + 7, 
                               responseData.begin() + 7 + payloadLength);
             
             // Convert payload to string for display
@@ -223,7 +267,7 @@ private:
     }
 
     // Request creation helpers
-    vector<byte> createQueryAvailabilityRequest(int requestId, const vector<string>& args) {
+    vector<unsigned char> createQueryAvailabilityRequest(int requestId, const vector<string>& args) {
         if (args.size() < 2) {
             throw runtime_error("Usage: query <facility_name> <day1> <day2> ...");
         }
@@ -238,7 +282,7 @@ private:
         return Marshaller::marshalQueryAvailabilityRequest(requestId, facilityName, days);
     }
 
-    vector<byte> createBookFacilityRequest(int requestId, const vector<string>& args) {
+    vector<unsigned char> createBookFacilityRequest(int requestId, const vector<string>& args) {
         if (args.size() != 5) {
             throw runtime_error("Usage: book <facility_name> <start_day> <start_time> <end_day> <end_time>");
         }
@@ -250,7 +294,7 @@ private:
         return Marshaller::marshalBookFacilityRequest(requestId, facilityName, startTime, endTime);
     }
 
-    vector<byte> createChangeBookingRequest(int requestId, const vector<string>& args) {
+    vector<unsigned char> createChangeBookingRequest(int requestId, const vector<string>& args) {
         if (args.size() != 2) {
             throw runtime_error("Usage: change <confirmation_id> <offset_minutes>");
         }
@@ -267,7 +311,7 @@ private:
         return Marshaller::marshalChangeBookingRequest(requestId, confirmationId, offsetMinutes);
     }
 
-    vector<byte> createMonitorAvailabilityRequest(int requestId, const vector<string>& args) {
+    vector<unsigned char> createMonitorAvailabilityRequest(int requestId, const vector<string>& args) {
         if (args.size() != 2) {
             throw runtime_error("Usage: monitor <facility_name> <interval_minutes>");
         }
@@ -284,7 +328,7 @@ private:
         return Marshaller::marshalMonitorAvailabilityRequest(requestId, facilityName, intervalMinutes);
     }
 
-    vector<byte> createExtendBookingRequest(int requestId, const vector<string>& args) {
+    vector<unsigned char> createExtendBookingRequest(int requestId, const vector<string>& args) {
         if (args.size() != 2) {
             throw runtime_error("Usage: extend <confirmation_id> <extend_minutes>");
         }
@@ -368,10 +412,22 @@ public:
         // Initialize random seed
         srand(time(nullptr));
         
+        // Initialize Winsock on Windows
+        #ifdef _WIN32
+            WSADATA wsaData;
+            if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+                cerr << "Failed to initialize Winsock" << endl;
+                exit(1);
+            }
+        #endif
+        
         // Create UDP socket
         clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
-        if (clientSocket < 0) {
-            cerr << "Error creating socket" << endl;
+        if (clientSocket == INVALID_SOCKET) {
+            cerr << "Error creating socket: " << WSAGetLastError() << endl;
+            #ifdef _WIN32
+                WSACleanup();
+            #endif
             exit(1);
         }
         
@@ -382,14 +438,24 @@ public:
         
         if (inet_pton(AF_INET, serverAddress.c_str(), &serverAddr.sin_addr) <= 0) {
             cerr << "Error: Invalid address " << serverAddress << endl;
-            close(clientSocket);
+            #ifdef _WIN32
+                closesocket(clientSocket);
+                WSACleanup();
+            #else
+                close(clientSocket);
+            #endif
             exit(1);
         }
     }
 
     ~BookingClient() {
-        if (clientSocket >= 0) {
-            close(clientSocket);
+        if (clientSocket != INVALID_SOCKET) {
+            #ifdef _WIN32
+                closesocket(clientSocket);
+                WSACleanup();
+            #else
+                close(clientSocket);
+            #endif
         }
     }
 
@@ -437,49 +503,68 @@ public:
                 args.push_back(tokens[i]);
             }
             
-            vector<byte> request = createRequest(command, args);
+            vector<unsigned char> request = createRequest(command, args);
             if (!request.empty()) {
-                vector<byte> responseData = sendRequest(request);
+                vector<unsigned char> responseData = sendRequest(request);
                 if (!responseData.empty()) {
                     processResponse(responseData);
                 }
             }
             
             // For monitor command, set up listening for updates if appropriate
-            if (command == "monitor" && !args.empty()) {
+            if (command == "monitor" && args.size() >= 2) {
                 try {
                     int monitorInterval = stoi(args[1]);
                     cout << "Monitoring facility for " << monitorInterval << " minutes..." << endl;
                     
                     // Set a larger timeout for the monitoring period
-                    struct timeval tv;
-                    tv.tv_sec = monitorInterval * 60;
-                    tv.tv_usec = 0;
-                    if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-                        cerr << "Failed to set socket timeout for monitoring" << endl;
-                        continue;
-                    }
+                    #ifdef _WIN32
+                        DWORD timeout = monitorInterval * 60 * 1000;  // Convert to milliseconds
+                        if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0) {
+                            cerr << "Failed to set socket timeout for monitoring: " << WSAGetLastError() << endl;
+                            continue;
+                        }
+                    #else
+                        struct timeval tv;
+                        tv.tv_sec = monitorInterval * 60;
+                        tv.tv_usec = 0;
+                        if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+                            cerr << "Failed to set socket timeout for monitoring" << endl;
+                            continue;
+                        }
+                    #endif
                     
                     // Listen for updates until timeout
                     auto startTime = chrono::steady_clock::now();
                     auto endTime = startTime + chrono::minutes(monitorInterval);
                     
                     while (chrono::steady_clock::now() < endTime) {
-                        vector<byte> buffer(MAX_MESSAGE_SIZE);
+                        vector<unsigned char> buffer(MAX_MESSAGE_SIZE);
                         struct sockaddr_in from;
-                        socklen_t fromlen = sizeof(from);
+                        int fromlen = sizeof(from);
                         
-                        int received = recvfrom(clientSocket, buffer.data(), buffer.size(), 0, 
+                        int received = recvfrom(clientSocket, (char*)buffer.data(), buffer.size(), 0, 
                                              (struct sockaddr*)&from, &fromlen);
                         
                         if (received < 0) {
-                            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                // Timeout - monitoring period ended
-                                break;
-                            } else {
-                                cerr << "Error receiving monitor update: " << strerror(errno) << endl;
-                                break;
-                            }
+                            #ifdef _WIN32
+                                int error = WSAGetLastError();
+                                if (error == WSAETIMEDOUT) {
+                                    // Timeout - monitoring period ended
+                                    break;
+                                } else {
+                                    cerr << "Error receiving monitor update: " << error << endl;
+                                    break;
+                                }
+                            #else
+                                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                                    // Timeout - monitoring period ended
+                                    break;
+                                } else {
+                                    cerr << "Error receiving monitor update: " << strerror(errno) << endl;
+                                    break;
+                                }
+                            #endif
                         }
                         
                         // Process the monitor update
@@ -488,7 +573,7 @@ public:
                         
                         if (header.operationType == MONITOR_AVAILABILITY && header.requestId == -1) {
                             // Extract facility name and availability data
-                            vector<byte> payload(buffer.begin() + 7, buffer.begin() + 7 + header.payloadLength);
+                            vector<unsigned char> payload(buffer.begin() + 7, buffer.begin() + 7 + header.payloadLength);
                             
                             // First 2 bytes are name length
                             uint16_t nameLength = (payload[0] << 8) | payload[1];
