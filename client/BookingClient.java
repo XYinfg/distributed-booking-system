@@ -1,6 +1,8 @@
 package client;
 
 import shared.*;
+import shared.constants.OperationType;
+import shared.constants.ProtocolConstants;
 
 import java.io.IOException;
 import java.net.*;
@@ -12,7 +14,6 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class BookingClient {

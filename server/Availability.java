@@ -19,7 +19,7 @@ public class Availability {
     }
 
     public void markBooked(LocalDateTime startTime, LocalDateTime endTime) {
-        TimeSlot bookingSlot = new TimeSlot(startTime.getDayOfWeek(), startTime.getHour(), startTime.getMinute(), endTime.getHour(), endTime.getMinute());
+        TimeSlot bookingSlot = new TimeSlot(startTime, endTime);
         for (int day = 0; day < 7; day++) {
             for (int hour = 0; hour < 24; hour++) {
                 TimeSlot slotToCheck = new TimeSlot(DayOfWeek.of(day + 1), hour, 0, hour + 1, 0); // 1-hour slots for simplicity in availability representation
@@ -31,7 +31,7 @@ public class Availability {
     }
 
     public void markAvailable(LocalDateTime startTime, LocalDateTime endTime) { // Reverses markBooked - for Change Booking or Cancellation if needed
-        TimeSlot bookingSlot = new TimeSlot(startTime.getDayOfWeek(), startTime.getHour(), startTime.getMinute(), endTime.getHour(), endTime.getMinute());
+        TimeSlot bookingSlot = new TimeSlot(startTime, endTime);
         for (int day = 0; day < 7; day++) {
             for (int hour = 0; hour < 24; hour++) {
                 TimeSlot slotToCheck = new TimeSlot(DayOfWeek.of(day + 1), hour, 0, hour + 1, 0);

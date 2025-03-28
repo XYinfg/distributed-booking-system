@@ -1,4 +1,4 @@
-package shared;
+package shared.constants;
 
 public enum OperationType {
     QUERY_AVAILABILITY((byte) 1),

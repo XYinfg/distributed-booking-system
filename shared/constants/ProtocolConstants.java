@@ -1,4 +1,4 @@
-package shared;
+package shared.constants;
 
 public class ProtocolConstants {
     public static final int SERVER_PORT = 2222;

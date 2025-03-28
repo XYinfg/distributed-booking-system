@@ -1,5 +1,7 @@
 package shared;
 
+import shared.constants.OperationType;
+
 public class MessageHeader {
     private int requestId;
     private OperationType operationType;

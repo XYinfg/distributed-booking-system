@@ -1,6 +1,7 @@
 package server;
 
 import java.time.DayOfWeek;
+import java.time.LocalDateTime;
 
 public class TimeSlot {
     private DayOfWeek dayOfWeek;
@@ -8,6 +9,14 @@ public class TimeSlot {
     private int startMinute;
     private int endHour;
     private int endMinute;
+
+    public TimeSlot(LocalDateTime startTime, LocalDateTime endTime) {
+        this.dayOfWeek = startTime.getDayOfWeek();
+        this.startHour = startTime.getHour();
+        this.startMinute = startTime.getMinute();
+        this.endHour = endTime.getHour();
+        this.endMinute = endTime.getMinute();
+    }
 
     public TimeSlot(DayOfWeek dayOfWeek, int startHour, int startMinute, int endHour, int endMinute) {
         this.dayOfWeek = dayOfWeek;
@@ -48,16 +57,16 @@ public class TimeSlot {
         // Check if intervals overlap: startA < endB && startB < endA
         return thisStart < otherEnd && otherStart < thisEnd;
     }
-    
+
 
     @Override
     public String toString() {
         return "TimeSlot{" +
-               "dayOfWeek=" + dayOfWeek +
-               ", startHour=" + startHour +
-               ", startMinute=" + startMinute +
-               ", endHour=" + endHour +
-               ", endMinute=" + endMinute +
-               '}';
+                "dayOfWeek=" + dayOfWeek +
+                ", startHour=" + startHour +
+                ", startMinute=" + startMinute +
+                ", endHour=" + endHour +
+                ", endMinute=" + endMinute +
+                '}';
     }
 }

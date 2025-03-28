@@ -45,17 +45,17 @@ public class Booking {
     }
 
     public boolean conflictsWith(TimeSlot slot) {
-        TimeSlot bookingSlot = new TimeSlot(startTime.getDayOfWeek(), startTime.getHour(), startTime.getMinute(), endTime.getHour(), endTime.getMinute());
+        TimeSlot bookingSlot = new TimeSlot(startTime, endTime);
         return bookingSlot.overlaps(slot);
     }
 
     @Override
     public String toString() {
         return "Booking{" +
-               "bookingId=" + bookingId +
-               ", facilityName='" + facilityName + '\'' +
-               ", startTime=" + startTime +
-               ", endTime=" + endTime +
-               '}';
+                "bookingId=" + bookingId +
+                ", facilityName='" + facilityName + '\'' +
+                ", startTime=" + startTime +
+                ", endTime=" + endTime +
+                '}';
     }
 }
