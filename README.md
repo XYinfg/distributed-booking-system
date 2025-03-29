@@ -76,26 +76,39 @@ The system implements the following services:
 ## 4. Project Structure
 
 ```
-ds_project/
-├── client/
-│   ├── BookingClient.java
-├── server/
-│   ├── BookingServer.java
-│   ├── Facility.java
-│   ├── Booking.java
-│   ├── RequestHistory.java
-│   ├── MonitorClient.java
-│   ├── Availability.java
-│   ├── TimeSlot.java
-├── shared/
-│   ├── OperationType.java
-│   ├── MessageHeader.java
-│   ├── Marshaller.java
-│   ├── ProtocolConstants.java
-├── compile.sh
-├── run_server.sh
-├── run_client.sh
-└── README.md
+|   compile.sh
+|   run_client.sh
+|   run_server.sh
+|
++---client
+|       BookingClient.cpp
+|
++---server
+|   |   Availability.java
+|   |   Booking.java
+|   |   BookingServer.java
+|   |   Facility.java
+|   |   FacilityService.java
+|   |   MessageService.java
+|   |   MonitorClient.java
+|   |   RequestHandler.java
+|   |   RequestHistory.java
+|   |   TimeSlot.java
+|   |
+|   \---exceptions
+|           FacilityBookingException.java
+|
+\---shared
+    |   Marshaller.cpp
+    |   Marshaller.h
+    |   Marshaller.java
+    |   MessageHeader.java
+    |
+    \---constants
+            ArgumentConstants.java
+            OperationType.java
+            Protocol.h
+            ProtocolConstants.java
 ```
 
 ## 5. Running the Project
