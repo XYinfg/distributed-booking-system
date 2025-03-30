@@ -73,8 +73,11 @@ public class BookingServer {
                 server.semantics = ArgumentConstants.Semantics.AT_MOST_ONCE;
             }
         } else {
+            System.out.println("No semantics provided.");
+            System.out.println("Default to at-most-once semantics");
             server.semantics = ArgumentConstants.Semantics.AT_MOST_ONCE;
         }
+        server.requestHandler.setSemantics(server.semantics);
         System.out.println("Server started with " + server.semantics.getValue() + " semantics.");
 
         // TODO: refactor to change into boolean function instead

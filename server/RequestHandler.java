@@ -21,12 +21,18 @@ public class RequestHandler {
     private final MessageService messageService;
     private Map<Integer, byte[]> replyCache;  // Cache last reply for each requestId
     private RequestHistory requestHistory;
+    private ArgumentConstants.Semantics semantics;
 
     public RequestHandler(FacilityService facilityService, MessageService messageService) {
         this.facilityService = facilityService;
         this.messageService = messageService;
         replyCache = new ConcurrentHashMap<>();
         requestHistory = new RequestHistory();
+        semantics = ArgumentConstants.Semantics.AT_MOST_ONCE;
+    }
+
+    public void setSemantics(ArgumentConstants.Semantics semantics) {
+        this.semantics = semantics;
     }
 
     public void processRequest(byte[] data, InetAddress clientAddr, int clientPort) {
@@ -37,7 +43,7 @@ public class RequestHandler {
 
         System.out.println("Received request from " + clientAddress + ", Request ID: " + requestId + ", Operation: " + operationType);
 
-        byte[] marshalledReply = handleRequest(requestId, operationType, data, clientAddress, ArgumentConstants.Semantics.AT_MOST_ONCE);
+        byte[] marshalledReply = handleRequest(requestId, operationType, data, clientAddress, semantics);
 
         if (marshalledReply != null) {
             // TODO: change false placeholder
