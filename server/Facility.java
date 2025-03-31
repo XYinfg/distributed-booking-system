@@ -1,5 +1,7 @@
 package server;
 
+import java.time.DayOfWeek;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,10 +28,13 @@ public class Facility {
         return bookings;
     }
 
-    public boolean isAvailable(TimeSlot slot) {
-        for (Booking booking : bookings) {
-            if (booking.conflictsWith(slot)) {
-                return false; // Facility is booked during this slot
+    public boolean isAvailable(LocalDateTime startTime, LocalDateTime endTime) {
+        DayOfWeek dayOfWeek = startTime.getDayOfWeek();
+        int startHour = startTime.getHour();
+        int endHour = endTime.getHour();
+        for (int i = startHour; i <= endHour; i++) {
+            if (!availability.isSlotAvailable(dayOfWeek, i)) {
+                return false;
             }
         }
         return true; // No bookings conflict, facility is available
@@ -48,9 +53,9 @@ public class Facility {
     @Override
     public String toString() {
         return "Facility{" +
-               "name='" + name + '\'' +
-               ", availability=" + availability +
-               ", bookings.size=" + bookings.size() +
-               '}';
+                "name='" + name + '\'' +
+                ", availability=" + availability +
+                ", bookings.size=" + bookings.size() +
+                '}';
     }
 }

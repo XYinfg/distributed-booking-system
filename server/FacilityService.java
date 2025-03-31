@@ -47,8 +47,7 @@ public class FacilityService {
 
     public boolean checkFacilityAvailability(String facilityName, LocalDateTime startTime, LocalDateTime endTime) {
         Facility facility = getFacilityByName(facilityName);
-        TimeSlot timeSlot = new TimeSlot(startTime, endTime);
-        return facility.isAvailable(timeSlot);
+        return facility.isAvailable(startTime, endTime);
     }
 
     public void markFacilityAvailable(String facilityName, LocalDateTime startTime, LocalDateTime endTime) {
@@ -64,7 +63,7 @@ public class FacilityService {
             bookings.put(booking.getBookingId(), booking);
             return booking;
         } else {
-            return null;
+            throw new FacilityBookingException("Facility '" + facilityName + "' is not available for the requested time.");
         }
     }
 

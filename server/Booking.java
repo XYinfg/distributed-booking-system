@@ -44,11 +44,6 @@ public class Booking {
         this.endTime = endTime;
     }
 
-    public boolean conflictsWith(TimeSlot slot) {
-        TimeSlot bookingSlot = new TimeSlot(startTime, endTime);
-        return bookingSlot.overlaps(slot);
-    }
-
     @Override
     public String toString() {
         return "Booking{" +

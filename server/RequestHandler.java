@@ -160,14 +160,12 @@ public class RequestHandler {
         LocalDateTime startTime = bookData.getStartTime();
         LocalDateTime endTime = bookData.getEndTime();
 
-        if (startTime.isAfter(endTime) || startTime.isEqual(endTime)) {
-            throw new IllegalArgumentException("Invalid booking time: start time must be before end time.");
+        if (startTime.getDayOfWeek() != endTime.getDayOfWeek()) {
+            throw new IllegalArgumentException("Invalid booking time: booking cannot be overnight!");
         }
 
-        Facility facility = facilityService.getFacilityByName(facilityName);
-        boolean facilityAvailable = facilityService.checkFacilityAvailability(facilityName, startTime, endTime);
-        if (!facilityAvailable) {
-            throw new FacilityBookingException("Facility '" + facility.getFacilityName() + "' is not available for the requested time.");
+        if (startTime.isAfter(endTime) || startTime.isEqual(endTime)) {
+            throw new IllegalArgumentException("Invalid booking time: start time must be before end time.");
         }
 
         Booking booking = facilityService.bookFacility(facilityName, startTime, endTime);

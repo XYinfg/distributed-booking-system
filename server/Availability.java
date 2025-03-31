@@ -19,25 +19,29 @@ public class Availability {
     }
 
     public void markBooked(LocalDateTime startTime, LocalDateTime endTime) {
-        TimeSlot bookingSlot = new TimeSlot(startTime, endTime);
-        for (int day = 0; day < 7; day++) {
-            for (int hour = 0; hour < 24; hour++) {
-                TimeSlot slotToCheck = new TimeSlot(DayOfWeek.of(day + 1), hour, 0, hour + 1, 0); // 1-hour slots for simplicity in availability representation
-                if (bookingSlot.overlaps(slotToCheck)) {
-                    weeklyAvailability[day][hour] = false; // Mark as booked
-                }
+        // We do not allow for overnight booking, exception is thrown in request handler before parsing into lower layers
+        // Similarly, we do the checking for startTime and endTime in request handler.
+        int startDay = startTime.getDayOfWeek().getValue();
+        int startHour = startTime.getHour();
+        int endDay = endTime.getDayOfWeek().getValue();
+        int endHour = endTime.getHour();
+        // Note that if user books from say 09:00 to 10:00, both the 09:00 and 10:00 slots will be unavailable
+        for (int i = startDay - 1; i < endDay; i++) {
+            for (int j = startHour; j <= endHour; j++) {
+                weeklyAvailability[i][j] = false;
             }
         }
     }
 
     public void markAvailable(LocalDateTime startTime, LocalDateTime endTime) { // Reverses markBooked - for Change Booking or Cancellation if needed
-        TimeSlot bookingSlot = new TimeSlot(startTime, endTime);
-        for (int day = 0; day < 7; day++) {
-            for (int hour = 0; hour < 24; hour++) {
-                TimeSlot slotToCheck = new TimeSlot(DayOfWeek.of(day + 1), hour, 0, hour + 1, 0);
-                if (bookingSlot.overlaps(slotToCheck)) {
-                    weeklyAvailability[day][hour] = true; // Mark as available again
-                }
+        int startDay = startTime.getDayOfWeek().getValue();
+        int startHour = startTime.getHour();
+        int endDay = endTime.getDayOfWeek().getValue();
+        int endHour = endTime.getHour();
+        // Note that if user releases slot from 09:00 to 10:00, both the 09:00 and 10:00 slots will become available
+        for (int i = startDay - 1; i < endDay; i++) {
+            for (int j = startHour; j <= endHour; j++) {
+                weeklyAvailability[i][j] = true;
             }
         }
     }
