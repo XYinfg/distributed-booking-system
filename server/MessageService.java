@@ -60,7 +60,7 @@ public class MessageService {
             byte[] updateMessage = shared.Marshaller.marshalAvailabilityUpdate(monitor.getFacilityName(), availabilityBytes);
 
             try {
-                // TODO: placeholder false now
+                // We will not simulate package loss for availability updates
                 sendMessage(updateMessage, monitor.getAddress().getAddress(), monitor.getAddress().getPort(), false);
                 System.out.println("Sent availability update for " + monitor.getFacilityName() + " to " + monitor.getAddress());
             } catch (Exception e) {

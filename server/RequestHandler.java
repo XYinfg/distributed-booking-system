@@ -51,7 +51,7 @@ public class RequestHandler {
         }
     }
 
-    public byte[] handleRequest(int requestId, OperationType operationType, byte[] data, InetSocketAddress clientAddress, ArgumentConstants.Semantics semantics) {
+    private byte[] handleRequest(int requestId, OperationType operationType, byte[] data, InetSocketAddress clientAddress, ArgumentConstants.Semantics semantics) {
 
         if (semantics == ArgumentConstants.Semantics.AT_LEAST_ONCE) {
             if (requestHistory.isDuplicate(requestId)) {
@@ -84,10 +84,12 @@ public class RequestHandler {
                 case BOOK_FACILITY:
                     shared.Marshaller.BookFacilityRequestData bookData = shared.Marshaller.unmarshalBookFacilityRequest(data);
                     replyPayload = handleBookFacility(bookData);
+                    replyCache.clear();
                     break;
                 case CHANGE_BOOKING:
                     shared.Marshaller.ChangeBookingRequestData changeData = shared.Marshaller.unmarshalChangeBookingRequest(data);
                     replyPayload = handleChangeBooking(changeData);
+                    replyCache.clear();
                     break;
                 case MONITOR_AVAILABILITY:
                     shared.Marshaller.MonitorAvailabilityRequestData monitorData = shared.Marshaller.unmarshalMonitorAvailabilityRequest(data);
@@ -99,6 +101,7 @@ public class RequestHandler {
                 case EXTEND_BOOKING:
                     shared.Marshaller.ExtendBookingRequestData extendData = shared.Marshaller.unmarshalExtendBookingRequest(data);
                     replyPayload = handleExtendBooking(extendData.getConfirmationId(), extendData.getExtendMinutes());
+                    replyCache.clear();
                     break;
                 default:
                     errorMessage = "Unknown operation type.";
@@ -134,25 +137,10 @@ public class RequestHandler {
         List<DayOfWeek> days = queryData.getDays();
         Facility facility = facilityService.getFacilityByName(facilityName);
 
-        StringBuilder availabilityInfo = new StringBuilder();
-        availabilityInfo.append("Availability for ").append(facility.getFacilityName()).append(":\n");
         Availability facilityAvailability = facility.getAvailability();
+        String availabilityInfo = facilityAvailability.toString(days);
 
-        for (DayOfWeek day : days) {
-            availabilityInfo.append(day).append(":\n");
-            boolean[][] weeklyAvailability = facilityAvailability.getWeeklyAvailability();
-            availabilityInfo.append("     ");
-            for (int hour = 0; hour < 24; hour++) {
-                availabilityInfo.append(String.format("%02d ", hour));
-            }
-            availabilityInfo.append("\n     ");
-            for (int hour = 0; hour < 24; hour++) {
-                availabilityInfo.append(weeklyAvailability[day.getValue() - 1][hour] ? "O " : "X ");
-            }
-            availabilityInfo.append("\n");
-        }
-
-        return availabilityInfo.toString().getBytes(StandardCharsets.UTF_8);
+        return availabilityInfo.getBytes(StandardCharsets.UTF_8);
     }
 
     private byte[] handleBookFacility(shared.Marshaller.BookFacilityRequestData bookData) {

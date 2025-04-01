@@ -3,6 +3,7 @@ package server;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
 public class Availability {
     private boolean[][] weeklyAvailability; // [DayOfWeek (0-6)][Hour (0-23)] - true if available, false if booked
@@ -50,23 +51,21 @@ public class Availability {
         return weeklyAvailability;
     }
 
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder("Availability:\n");
-        String[] daysOfWeek = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
-        sb.append("     ");
-        for (int hour = 0; hour < 24; hour++) {
-            sb.append(String.format("%02d ", hour));
-        }
-        sb.append("\n");
-
-        for (int day = 0; day < 7; day++) {
-            sb.append(daysOfWeek[day]).append(": ");
+    public String toString(List<DayOfWeek> days) {
+        StringBuilder availabilityInfo = new StringBuilder("Availability:");
+        availabilityInfo.append("\n");
+        for (DayOfWeek day : days) {
+            availabilityInfo.append(day).append(":\n");
+            availabilityInfo.append("     ");
             for (int hour = 0; hour < 24; hour++) {
-                sb.append(weeklyAvailability[day][hour] ? "O " : "X "); // O for Open, X for Booked
+                availabilityInfo.append(String.format("%02d ", hour));
             }
-            sb.append("\n");
+            availabilityInfo.append("\n     ");
+            for (int hour = 0; hour < 24; hour++) {
+                availabilityInfo.append(weeklyAvailability[day.getValue() - 1][hour] ? " O " : " X ");
+            }
+            availabilityInfo.append("\n");
         }
-        return sb.toString();
+        return availabilityInfo.toString();
     }
 }
