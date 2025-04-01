@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -19,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RequestHandler {
     private final FacilityService facilityService;
     private final MessageService messageService;
-    private Map<Integer, byte[]> replyCache;  // Cache last reply for each requestId
+    private Map<String, byte[]> replyCache;  // Cache last reply for each requestId
     private RequestHistory requestHistory;
     private ArgumentConstants.Semantics semantics;
 
@@ -52,11 +53,11 @@ public class RequestHandler {
     }
 
     private byte[] handleRequest(int requestId, OperationType operationType, byte[] data, InetSocketAddress clientAddress, ArgumentConstants.Semantics semantics) {
-
+        String request = Arrays.toString(data);
         if (semantics == ArgumentConstants.Semantics.AT_LEAST_ONCE) {
-            if (requestHistory.isDuplicate(requestId)) {
+            if (requestHistory.isDuplicate(request)) {
                 //  Try to fetch reply from cache
-                byte[] cachedReply = replyCache.get(requestId);
+                byte[] cachedReply = replyCache.get(request);
                 if (cachedReply != null) {
                     System.out.println("Duplicate request ID: " + requestId + ", resending cached reply.");
                     return cachedReply;
@@ -66,7 +67,7 @@ public class RequestHandler {
             }
         } else {
             // Semantics is at-most-once
-            if (requestHistory.isDuplicate(requestId)) {
+            if (requestHistory.isDuplicate(request)) {
                 System.out.println("Duplicate request ID (At-Most-Once): " + requestId + ", ignoring.");
                 return null;
             }
@@ -76,6 +77,10 @@ public class RequestHandler {
         byte[] replyPayload = null;
 
         try {
+            System.out.println("Request received from:");
+            System.out.println("\tHost Name: " + clientAddress.getHostName());
+            System.out.println("\tClient Port: " + clientAddress.getPort());
+            System.out.println("Request ID: " + requestId + ", Operation Type:" + operationType);
             switch (operationType) {
                 case QUERY_AVAILABILITY:
                     shared.Marshaller.QueryAvailabilityRequestData queryData = shared.Marshaller.unmarshalQueryAvailabilityRequest(data);
@@ -121,13 +126,13 @@ public class RequestHandler {
         byte[] marshalledReply;
         if (replyPayload != null) {
             marshalledReply = BookingServer.Marshaller.marshalReply(requestId, operationType, replyPayload);
-            replyCache.put(requestId, marshalledReply);
+            replyCache.put(request, marshalledReply);
         } else {
             marshalledReply = BookingServer.Marshaller.marshalErrorReply(requestId, operationType, errorMessage != null ? errorMessage : "Unknown error");
-            replyCache.remove(requestId);
+            replyCache.remove(request);
         }
 
-        requestHistory.addRequestId(requestId);
+        requestHistory.addRequest(request);
 
         return marshalledReply;
     }

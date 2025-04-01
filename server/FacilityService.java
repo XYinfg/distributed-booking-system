@@ -86,7 +86,7 @@ public class FacilityService {
     }
 
     public List<MonitorClient> getMonitorsToNotify(String facilityName) {
-        return monitors.values().stream().filter(monitor -> monitor.getFacilityName().equals(facilityName))
+        return monitors.values().stream().filter(monitor -> monitor.getFacilityName().equalsIgnoreCase(facilityName))
                 .collect(Collectors.toList());
     }
 

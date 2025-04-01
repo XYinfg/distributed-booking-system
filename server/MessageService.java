@@ -5,6 +5,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.DayOfWeek;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,7 +46,9 @@ public class MessageService {
     }
 
     public void triggerMonitorUpdates(String facilityName) {
+        System.out.println("Triggered monitor updates...");
         List<MonitorClient> monitorsToNotify = facilityService.getMonitorsToNotify(facilityName);
+        System.out.println("Monitors to Notify: " + monitorsToNotify.toString());
         if (!monitorsToNotify.isEmpty()) {
             monitorUpdateExecutor.submit(() -> {
                 monitorsToNotify.forEach(this::sendAvailabilityUpdateToMonitor);
@@ -56,17 +60,23 @@ public class MessageService {
         Facility facility = facilityService.getFacilityByName(monitor.getFacilityName());
         // Should never be null
         if (facility != null) {
-            byte[] availabilityBytes = facility.getAvailability().toString().getBytes(StandardCharsets.UTF_8);
-            byte[] updateMessage = shared.Marshaller.marshalAvailabilityUpdate(monitor.getFacilityName(), availabilityBytes);
-
-            try {
-                // We will not simulate package loss for availability updates
-                sendMessage(updateMessage, monitor.getAddress().getAddress(), monitor.getAddress().getPort(), false);
-                System.out.println("Sent availability update for " + monitor.getFacilityName() + " to " + monitor.getAddress());
-            } catch (Exception e) {
-                System.err.println("Error sending monitor update to " + monitor.getAddress() + ": " + e.getMessage());
-                e.printStackTrace();
+            Availability availability = facility.getAvailability();
+            for (DayOfWeek day : DayOfWeek.values()) {
+                byte[] availabilityForDay = availability.toString(Arrays.asList(day)).getBytes(StandardCharsets.UTF_8);
+                byte[] updateMessage = shared.Marshaller.marshalAvailabilityUpdate(monitor.getFacilityName(), availabilityForDay);
+                sendMessage(updateMessage, monitor.getAddress().getAddress(), monitor.getAddress().getPort());
             }
+//            byte[] availabilityBytes = facility.getAvailability().toString(Arrays.asList(DayOfWeek.values())).getBytes(StandardCharsets.UTF_8);
+//            byte[] updateMessage = shared.Marshaller.marshalAvailabilityUpdate(monitor.getFacilityName(), availabilityBytes);
+
+//            try {
+//                // We will not simulate package loss for availability updates
+//                sendMessage(updateMessage, monitor.getAddress().getAddress(), monitor.getAddress().getPort(), false);
+//                System.out.println("Sent availability update for " + monitor.getFacilityName() + " to " + monitor.getAddress());
+//            } catch (Exception e) {
+//                System.err.println("Error sending monitor update to " + monitor.getAddress() + ": " + e.getMessage());
+//                e.printStackTrace();
+//            }
         }
     }
 
