@@ -1,6 +1,7 @@
 package server;
 
 import server.exceptions.FacilityBookingException;
+import shared.Marshaller;
 import shared.MessageHeader;
 import shared.constants.ArgumentConstants;
 import shared.constants.OperationType;
@@ -41,14 +42,14 @@ public class RequestHandler {
         MessageHeader header = shared.Marshaller.unmarshalHeader(data);
         int requestId = header.getRequestId();
         OperationType operationType = header.getOperationType();
+        boolean simulateLoss = header.getSimulateLoss();
 
         System.out.println("Received request from " + clientAddress + ", Request ID: " + requestId + ", Operation: " + operationType);
 
         byte[] marshalledReply = handleRequest(requestId, operationType, data, clientAddress, semantics);
 
         if (marshalledReply != null) {
-            // TODO: change false placeholder
-            messageService.sendMessage(marshalledReply, clientAddr, clientPort, false);
+            messageService.sendMessage(marshalledReply, clientAddr, clientPort, simulateLoss);
         }
     }
 
@@ -125,10 +126,10 @@ public class RequestHandler {
 
         byte[] marshalledReply;
         if (replyPayload != null) {
-            marshalledReply = BookingServer.Marshaller.marshalReply(requestId, operationType, replyPayload);
+            marshalledReply = Marshaller.marshalReply(requestId, operationType, replyPayload);
             replyCache.put(request, marshalledReply);
         } else {
-            marshalledReply = BookingServer.Marshaller.marshalErrorReply(requestId, operationType, errorMessage != null ? errorMessage : "Unknown error");
+            marshalledReply = Marshaller.marshalErrorReply(requestId, operationType, errorMessage != null ? errorMessage : "Unknown error");
             replyCache.remove(request);
         }
 
@@ -162,11 +163,14 @@ public class RequestHandler {
         }
 
         Booking booking = facilityService.bookFacility(facilityName, startTime, endTime);
+        String bookingId = booking.getConfirmationIdAsString();
+
+        System.out.println("New booking for: " + facilityName + ", Booking ID: " + bookingId);
 
         // Notify monitoring clients about availability update asynchronously.
         messageService.triggerMonitorUpdates(facilityName);
 
-        return booking.getConfirmationIdAsString().getBytes(StandardCharsets.UTF_8);
+        return bookingId.getBytes(StandardCharsets.UTF_8);
     }
 
     private void handleMonitorAvailability(shared.Marshaller.MonitorAvailabilityRequestData monitorData, InetSocketAddress clientAddress) throws FacilityBookingException {

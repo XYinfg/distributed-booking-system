@@ -15,18 +15,39 @@ public class Marshaller {
 
     // --- Marshalling ---
 
-    public static byte[] marshalHeader(MessageHeader header) {
-        ByteBuffer buffer = ByteBuffer.allocate(7).order(ByteOrder.BIG_ENDIAN);
-        buffer.putInt(header.getRequestId());
-        buffer.put(header.getOperationType().getCode());
-        buffer.putShort(header.getPayloadLength());
+    // We simulate loss from server to client by not sending reply, thus simulateLoss is always false here
+    public static byte[] marshalReplyHeader(int requestId, OperationType operationType, short payloadLength) {
+        ByteBuffer buffer = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN);
+        buffer.putInt(requestId);
+        buffer.put(operationType.getCode());
+        buffer.putShort(payloadLength);
+        buffer.put((byte) 0);
+        return buffer.array();
+    }
+
+    public static byte[] marshalReply(int requestId, OperationType operationType, byte[] payload) {
+        int payloadLength = payload != null ? payload.length : 0;
+        ByteBuffer buffer = ByteBuffer.allocate(8 + payloadLength).order(ByteOrder.BIG_ENDIAN);
+        buffer.put(marshalReplyHeader(requestId, operationType, (short) payloadLength));
+        if (payload != null) {
+            buffer.put(payload);
+        }
+        return buffer.array();
+    }
+
+    public static byte[] marshalErrorReply(int requestId, OperationType operationType, String errorMessage) {
+        byte[] errorBytes = errorMessage.getBytes(StandardCharsets.UTF_8);
+        int payloadLength = errorBytes.length;
+        ByteBuffer buffer = ByteBuffer.allocate(8 + payloadLength).order(ByteOrder.BIG_ENDIAN);
+        buffer.put(marshalReplyHeader(requestId, operationType, (short) payloadLength));
+        buffer.put(errorBytes);
         return buffer.array();
     }
 
     public static byte[] marshalQueryAvailabilityRequest(int requestId, String facilityName, List<DayOfWeek> days) {
         byte[] nameBytes = facilityName.getBytes(StandardCharsets.UTF_8);
         int payloadLength = 2 + nameBytes.length + 4 * days.size(); // short (nameLen) + nameBytes + int (day) * days.size();
-        ByteBuffer buffer = ByteBuffer.allocate(7 + payloadLength).order(ByteOrder.BIG_ENDIAN); // Header + Payload
+        ByteBuffer buffer = ByteBuffer.allocate(8 + payloadLength).order(ByteOrder.BIG_ENDIAN); // Header + Payload
         marshalHeaderIntoBuffer(buffer, requestId, OperationType.QUERY_AVAILABILITY, (short) payloadLength);
 
         buffer.putShort((short) nameBytes.length);
@@ -40,7 +61,7 @@ public class Marshaller {
     public static byte[] marshalBookFacilityRequest(int requestId, String facilityName, LocalDateTime startTime, LocalDateTime endTime) {
         byte[] nameBytes = facilityName.getBytes(StandardCharsets.UTF_8);
         int payloadLength = 2 + nameBytes.length + 3 * 4 + 3 * 4; // short (nameLen) + nameBytes + 3 ints (startTime) + 3 ints (endTime)
-        ByteBuffer buffer = ByteBuffer.allocate(7 + payloadLength).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.allocate(8 + payloadLength).order(ByteOrder.BIG_ENDIAN);
         marshalHeaderIntoBuffer(buffer, requestId, OperationType.BOOK_FACILITY, (short) payloadLength);
 
         buffer.putShort((short) nameBytes.length);
@@ -53,7 +74,7 @@ public class Marshaller {
     public static byte[] marshalChangeBookingRequest(int requestId, String confirmationId, int offsetMinutes) {
         byte[] confirmationIdBytes = confirmationId.getBytes(StandardCharsets.UTF_8);
         int payloadLength = 2 + confirmationIdBytes.length + 4; // short (confirmationIdLen) + confirmationIdBytes + int (offsetMinutes)
-        ByteBuffer buffer = ByteBuffer.allocate(7 + payloadLength).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.allocate(8 + payloadLength).order(ByteOrder.BIG_ENDIAN);
         marshalHeaderIntoBuffer(buffer, requestId, OperationType.CHANGE_BOOKING, (short) payloadLength);
 
         buffer.putShort((short) confirmationIdBytes.length);
@@ -65,7 +86,7 @@ public class Marshaller {
     public static byte[] marshalMonitorAvailabilityRequest(int requestId, String facilityName, int monitorIntervalMinutes) {
         byte[] nameBytes = facilityName.getBytes(StandardCharsets.UTF_8);
         int payloadLength = 2 + nameBytes.length + 4; // short (nameLen) + nameBytes + int (monitorIntervalMinutes)
-        ByteBuffer buffer = ByteBuffer.allocate(7 + payloadLength).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.allocate(8 + payloadLength).order(ByteOrder.BIG_ENDIAN);
         marshalHeaderIntoBuffer(buffer, requestId, OperationType.MONITOR_AVAILABILITY, (short) payloadLength);
 
         buffer.putShort((short) nameBytes.length);
@@ -75,7 +96,7 @@ public class Marshaller {
     }
 
     public static byte[] marshalGetServerStatusRequest(int requestId) {
-        ByteBuffer buffer = ByteBuffer.allocate(7).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN);
         marshalHeaderIntoBuffer(buffer, requestId, OperationType.GET_SERVER_STATUS, (short) 0); // No payload
         return buffer.array();
     }
@@ -83,7 +104,7 @@ public class Marshaller {
     public static byte[] marshalExtendBookingRequest(int requestId, String confirmationId, int extendMinutes) {
         byte[] confirmationIdBytes = confirmationId.getBytes(StandardCharsets.UTF_8);
         int payloadLength = 2 + confirmationIdBytes.length + 4; // short (confirmationIdLen) + confirmationIdBytes + int (extendMinutes)
-        ByteBuffer buffer = ByteBuffer.allocate(7 + payloadLength).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.allocate(8 + payloadLength).order(ByteOrder.BIG_ENDIAN);
         marshalHeaderIntoBuffer(buffer, requestId, OperationType.EXTEND_BOOKING, (short) payloadLength);
 
         buffer.putShort((short) confirmationIdBytes.length);
@@ -95,10 +116,9 @@ public class Marshaller {
     public static byte[] marshalAvailabilityUpdate(String facilityName, byte[] availabilityData) { // For Monitor updates
         byte[] nameBytes = facilityName.getBytes(StandardCharsets.UTF_8);
         int payloadLength = 2 + nameBytes.length + availabilityData.length; // short (nameLen) + nameBytes + availabilityData
-        ByteBuffer buffer = ByteBuffer.allocate(7 + payloadLength).order(ByteOrder.BIG_ENDIAN);
-        buffer.putInt(-1); // Request ID -1 for server-initiated callbacks (Monitor Updates)
-        buffer.put(OperationType.MONITOR_AVAILABILITY.getCode()); // Re-use MONITOR_AVAILABILITY op code to indicate update
-        buffer.putShort((short) payloadLength);
+        ByteBuffer buffer = ByteBuffer.allocate(8 + payloadLength).order(ByteOrder.BIG_ENDIAN);
+        // Request ID -1 for server-initiated callbacks (Monitor Updates)
+        marshalHeaderIntoBuffer(buffer, -1, OperationType.MONITOR_AVAILABILITY, (short) payloadLength);
         buffer.putShort((short) nameBytes.length);
         buffer.put(nameBytes);
         buffer.put(availabilityData);
@@ -109,15 +129,16 @@ public class Marshaller {
     // --- Unmarshalling ---
 
     public static MessageHeader unmarshalHeader(byte[] message) {
-        ByteBuffer buffer = ByteBuffer.wrap(message, 0, 7).order(ByteOrder.BIG_ENDIAN); // Header is always first 7 bytes
+        ByteBuffer buffer = ByteBuffer.wrap(message, 0, 8).order(ByteOrder.BIG_ENDIAN); // Header is always first 8 bytes
         int requestId = buffer.getInt();
         OperationType operationType = OperationType.fromCode(buffer.get());
         short payloadLength = buffer.getShort();
-        return new MessageHeader(requestId, operationType, payloadLength);
+        byte simulateLossByte = buffer.get();
+        return new MessageHeader(requestId, operationType, payloadLength, simulateLossByte);
     }
 
     public static QueryAvailabilityRequestData unmarshalQueryAvailabilityRequest(byte[] message) {
-        ByteBuffer buffer = ByteBuffer.wrap(message, 7, message.length - 7).order(ByteOrder.BIG_ENDIAN); // Skip header
+        ByteBuffer buffer = ByteBuffer.wrap(message, 8, message.length - 8).order(ByteOrder.BIG_ENDIAN); // Skip header
         short nameLength = buffer.getShort();
         byte[] nameBytes = new byte[nameLength];
         buffer.get(nameBytes);
@@ -131,7 +152,7 @@ public class Marshaller {
     }
 
     public static BookFacilityRequestData unmarshalBookFacilityRequest(byte[] message) {
-        ByteBuffer buffer = ByteBuffer.wrap(message, 7, message.length - 7).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.wrap(message, 8, message.length - 8).order(ByteOrder.BIG_ENDIAN);
         short nameLength = buffer.getShort();
         byte[] nameBytes = new byte[nameLength];
         buffer.get(nameBytes);
@@ -143,7 +164,7 @@ public class Marshaller {
     }
 
     public static ChangeBookingRequestData unmarshalChangeBookingRequest(byte[] message) {
-        ByteBuffer buffer = ByteBuffer.wrap(message, 7, message.length - 7).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.wrap(message, 8, message.length - 8).order(ByteOrder.BIG_ENDIAN);
         short confirmationIdLength = buffer.getShort();
         byte[] confirmationIdBytes = new byte[confirmationIdLength];
         buffer.get(confirmationIdBytes);
@@ -153,7 +174,7 @@ public class Marshaller {
     }
 
     public static MonitorAvailabilityRequestData unmarshalMonitorAvailabilityRequest(byte[] message) {
-        ByteBuffer buffer = ByteBuffer.wrap(message, 7, message.length - 7).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.wrap(message, 8, message.length - 8).order(ByteOrder.BIG_ENDIAN);
         short nameLength = buffer.getShort();
         byte[] nameBytes = new byte[nameLength];
         buffer.get(nameBytes);
@@ -163,7 +184,7 @@ public class Marshaller {
     }
 
     public static ExtendBookingRequestData unmarshalExtendBookingRequest(byte[] message) {
-        ByteBuffer buffer = ByteBuffer.wrap(message, 7, message.length - 7).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.wrap(message, 8, message.length - 8).order(ByteOrder.BIG_ENDIAN);
         short confirmationIdLength = buffer.getShort();
         byte[] confirmationIdBytes = new byte[confirmationIdLength];
         buffer.get(confirmationIdBytes);
@@ -176,9 +197,15 @@ public class Marshaller {
     // --- Helper Marshalling/Unmarshalling Methods ---
 
     private static void marshalHeaderIntoBuffer(ByteBuffer buffer, int requestId, OperationType operationType, short payloadLength) {
+        marshalHeaderIntoBuffer(buffer, requestId, operationType, payloadLength, false);
+    }
+
+    private static void marshalHeaderIntoBuffer(ByteBuffer buffer, int requestId, OperationType operationType, short payloadLength, boolean simulateLoss) {
         buffer.putInt(requestId);
         buffer.put(operationType.getCode());
         buffer.putShort(payloadLength);
+        byte simulateLossByte = simulateLoss ? (byte) 1 : (byte) 0;
+        buffer.put(simulateLossByte);
     }
 
     private static void marshalDateTime(ByteBuffer buffer, LocalDateTime dateTime) {
@@ -188,15 +215,15 @@ public class Marshaller {
     }
 
     private static LocalDateTime unmarshalDateTime(ByteBuffer buffer) {
-    DayOfWeek dayOfWeek = DayOfWeek.of(buffer.getInt());
-    int hour = buffer.getInt();
-    int minute = buffer.getInt();
-    
-    // Create a base LocalDateTime using today's date at the specified time
-    LocalDateTime base = LocalDateTime.now().withHour(hour).withMinute(minute).withSecond(0).withNano(0);
-    // Adjust to the next or same occurrence of the given day
-    base = base.with(TemporalAdjusters.nextOrSame(dayOfWeek));
-    return base;
+        DayOfWeek dayOfWeek = DayOfWeek.of(buffer.getInt());
+        int hour = buffer.getInt();
+        int minute = buffer.getInt();
+
+        // Create a base LocalDateTime using today's date at the specified time
+        LocalDateTime base = LocalDateTime.now().withHour(hour).withMinute(minute).withSecond(0).withNano(0);
+        // Adjust to the next or same occurrence of the given day
+        base = base.with(TemporalAdjusters.nextOrSame(dayOfWeek));
+        return base;
     }
 
 

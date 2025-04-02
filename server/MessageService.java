@@ -16,6 +16,7 @@ public class MessageService {
     private final FacilityService facilityService;
     private final ExecutorService monitorUpdateExecutor;
     private DatagramSocket socket;
+    private boolean sendThisTime = false;
 
     public MessageService(FacilityService facilityService) {
         this.facilityService = facilityService;
@@ -29,7 +30,12 @@ public class MessageService {
 
     public void sendMessage(byte[] replyMessage, InetAddress clientAddress, int clientPort, boolean simulatePacketLoss) {
         if (simulatePacketLoss) {
-            System.out.println("[SIMULATED PACKET LOSS - SERVER SEND]");
+            if (sendThisTime) {
+                sendMessage(replyMessage, clientAddress, clientPort);
+            } else {
+                System.out.println("[SIMULATED PACKET LOSS - SERVER SEND]");
+            }
+            sendThisTime = !sendThisTime;
             return;
         }
         sendMessage(replyMessage, clientAddress, clientPort);

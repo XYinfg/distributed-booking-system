@@ -24,12 +24,7 @@ private:
     bool atLeastOnceSemanticsEnabled = false;
     double packetLossProbability = 0.0;
 
-    bool simulatePacketLoss()
-    {
-        return ((double)rand() / RAND_MAX) < packetLossProbability;
-    }
-
-    vector<unsigned char> createRequest(const string &command, const vector<string> &args)
+    vector<unsigned char> createRequest(const string &command, const vector<string> &args, bool simulateLoss)
     {
         requestCounter++;
         int requestId = requestCounter;
@@ -38,27 +33,27 @@ private:
         {
             if (command == "query")
             {
-                return createQueryAvailabilityRequest(requestId, args);
+                return createQueryAvailabilityRequest(requestId, args, simulateLoss);
             }
             else if (command == "book")
             {
-                return createBookFacilityRequest(requestId, args);
+                return createBookFacilityRequest(requestId, args, simulateLoss);
             }
             else if (command == "change")
             {
-                return createChangeBookingRequest(requestId, args);
+                return createChangeBookingRequest(requestId, args, simulateLoss);
             }
             else if (command == "monitor")
             {
-                return createMonitorAvailabilityRequest(requestId, args);
+                return createMonitorAvailabilityRequest(requestId, args, simulateLoss);
             }
             else if (command == "status")
             {
-                return Marshaller::marshalGetServerStatusRequest(requestId);
+                return Marshaller::marshalGetServerStatusRequest(requestId, simulateLoss);
             }
             else if (command == "extend")
             {
-                return createExtendBookingRequest(requestId, args);
+                return createExtendBookingRequest(requestId, args, simulateLoss);
             }
             else
             {
@@ -73,7 +68,7 @@ private:
         }
     }
 
-    vector<unsigned char> sendRequest(const vector<unsigned char> &request)
+    vector<unsigned char> sendRequest(const vector<unsigned char> &request, bool simulateLoss)
     {
         if (request.empty())
             return vector<unsigned char>();
@@ -83,11 +78,11 @@ private:
             if (atLeastOnceSemanticsEnabled)
             {
                 MessageHeader header = Marshaller::unmarshalHeader(request);
-                return sendWithRetry(request, header.requestId);
+                return sendWithRetry(request, header.requestId, simulateLoss);
             }
             else
             {
-                return sendAtMostOnce(request);
+                return sendAtMostOnce(request, simulateLoss);
             }
         }
         catch (const exception &e)
@@ -97,9 +92,9 @@ private:
         }
     }
 
-    vector<unsigned char> sendAtMostOnce(const vector<unsigned char> &request)
+    vector<unsigned char> sendAtMostOnce(const vector<unsigned char> &request, bool simulateLoss)
     {
-        if (simulatePacketLoss())
+        if (simulateLoss)
         {
             cout << "[SIMULATED PACKET LOSS - CLIENT SEND]" << endl;
             return vector<unsigned char>();
@@ -168,7 +163,7 @@ private:
             return vector<unsigned char>();
         }
 
-        if (simulatePacketLoss())
+        if (simulateLoss)
         {
             cout << "[SIMULATED PACKET LOSS - CLIENT RECEIVE]" << endl;
             return vector<unsigned char>();
@@ -179,12 +174,12 @@ private:
         return buffer;
     }
 
-    vector<unsigned char> sendWithRetry(const vector<unsigned char> &request, int requestId)
+    vector<unsigned char> sendWithRetry(const vector<unsigned char> &request, int requestId, bool simulateLoss)
     {
         int retries = 3;
         while (retries-- > 0)
         {
-            if (simulatePacketLoss())
+            if (simulateLoss && retries == 2)
             {
                 cout << "[SIMULATED PACKET LOSS - CLIENT SEND (Retry "
                      << (3 - retries) << ")]" << endl;
@@ -266,7 +261,7 @@ private:
             }
             else
             {
-                if (simulatePacketLoss())
+                if (simulateLoss && retries == 2)
                 {
                     cout << "[SIMULATED PACKET LOSS - CLIENT RECEIVE (Retry "
                          << (3 - retries) << ")]" << endl;
@@ -293,8 +288,8 @@ private:
         if (payloadLength > 0)
         {
             // Extract payload bytes
-            vector<unsigned char> payload(responseData.begin() + 7,
-                                          responseData.begin() + 7 + payloadLength);
+            vector<unsigned char> payload(responseData.begin() + 8,
+                                          responseData.begin() + 8 + payloadLength);
 
             // Convert payload to string for display
             string payloadStr(payload.begin(), payload.end());
@@ -331,7 +326,7 @@ private:
     }
 
     // Request creation helpers
-    vector<unsigned char> createQueryAvailabilityRequest(int requestId, const vector<string> &args)
+    vector<unsigned char> createQueryAvailabilityRequest(int requestId, const vector<string> &args, bool simulateLoss)
     {
         if (args.size() < 2)
         {
@@ -346,10 +341,10 @@ private:
             days.push_back(stringToDayOfWeek(args[i]));
         }
 
-        return Marshaller::marshalQueryAvailabilityRequest(requestId, facilityName, days);
+        return Marshaller::marshalQueryAvailabilityRequest(requestId, facilityName, days, simulateLoss);
     }
 
-    vector<unsigned char> createBookFacilityRequest(int requestId, const vector<string> &args)
+    vector<unsigned char> createBookFacilityRequest(int requestId, const vector<string> &args, bool simulateLoss)
     {
         if (args.size() != 5)
         {
@@ -360,10 +355,10 @@ private:
         DateTime startTime = parseDateTime(args[1] + " " + args[2]);
         DateTime endTime = parseDateTime(args[3] + " " + args[4]);
 
-        return Marshaller::marshalBookFacilityRequest(requestId, facilityName, startTime, endTime);
+        return Marshaller::marshalBookFacilityRequest(requestId, facilityName, startTime, endTime, simulateLoss);
     }
 
-    vector<unsigned char> createChangeBookingRequest(int requestId, const vector<string> &args)
+    vector<unsigned char> createChangeBookingRequest(int requestId, const vector<string> &args, bool simulateLoss)
     {
         if (args.size() != 2)
         {
@@ -382,10 +377,10 @@ private:
             throw runtime_error("Invalid offset minutes. Must be an integer.");
         }
 
-        return Marshaller::marshalChangeBookingRequest(requestId, confirmationId, offsetMinutes);
+        return Marshaller::marshalChangeBookingRequest(requestId, confirmationId, offsetMinutes, simulateLoss);
     }
 
-    vector<unsigned char> createMonitorAvailabilityRequest(int requestId, const vector<string> &args)
+    vector<unsigned char> createMonitorAvailabilityRequest(int requestId, const vector<string> &args, bool simulateLoss)
     {
         if (args.size() != 2)
         {
@@ -404,10 +399,10 @@ private:
             throw runtime_error("Invalid monitor interval minutes. Must be an integer.");
         }
 
-        return Marshaller::marshalMonitorAvailabilityRequest(requestId, facilityName, intervalMinutes);
+        return Marshaller::marshalMonitorAvailabilityRequest(requestId, facilityName, intervalMinutes, simulateLoss);
     }
 
-    vector<unsigned char> createExtendBookingRequest(int requestId, const vector<string> &args)
+    vector<unsigned char> createExtendBookingRequest(int requestId, const vector<string> &args, bool simulateLoss)
     {
         if (args.size() != 2)
         {
@@ -426,7 +421,7 @@ private:
             throw runtime_error("Invalid extend minutes. Must be an integer.");
         }
 
-        return Marshaller::marshalExtendBookingRequest(requestId, confirmationId, extendMinutes);
+        return Marshaller::marshalExtendBookingRequest(requestId, confirmationId, extendMinutes, simulateLoss);
     }
 
     // Helper methods
@@ -589,6 +584,8 @@ public:
 
         while (true)
         {
+            bool clientSimulateLoss = false;
+            bool serverSimulateLoss = false;
             cout << "Enter command (query, book, change, monitor, status, extend, exit): ";
             getline(cin, input);
 
@@ -620,13 +617,23 @@ public:
             args.clear();
             for (size_t i = 1; i < tokens.size(); i++)
             {
+                if (tokens[i] == "-client-simulate-loss")
+                {
+                    clientSimulateLoss = true;
+                    continue;
+                }
+                else if (tokens[i] == "-server-simulate-loss")
+                {
+                    serverSimulateLoss = true;
+                    continue;
+                }
                 args.push_back(tokens[i]);
             }
 
-            vector<unsigned char> request = createRequest(command, args);
+            vector<unsigned char> request = createRequest(command, args, serverSimulateLoss);
             if (!request.empty())
             {
-                vector<unsigned char> responseData = sendRequest(request);
+                vector<unsigned char> responseData = sendRequest(request, clientSimulateLoss);
                 if (!responseData.empty())
                 {
                     processResponse(responseData);
@@ -708,10 +715,10 @@ public:
                         if (header.operationType == MONITOR_AVAILABILITY && header.requestId == -1)
                         {
                             // Extract facility name and availability data
-                            vector<unsigned char> payload(buffer.begin() + 7, buffer.begin() + 7 + header.payloadLength);
+                            vector<unsigned char> payload(buffer.begin() + 8, buffer.begin() + 8 + header.payloadLength);
 
                             // First 2 bytes are name length
-                            uint16_t nameLength = (payload[0] << 8) | payload[1];
+                            uint16_t nameLength = (payload[0] << 9) | payload[1];
                             string facilityName(payload.begin() + 2, payload.begin() + 2 + nameLength);
                             string availabilityData(payload.begin() + 2 + nameLength, payload.end());
 

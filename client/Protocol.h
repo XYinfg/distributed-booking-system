@@ -6,16 +6,16 @@
 #include <string>
 
 #ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "Ws2_32.lib")
-    // Don't redefine byte - it's already defined in Windows headers
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "Ws2_32.lib")
+// Don't redefine byte - it's already defined in Windows headers
 #else
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    typedef unsigned char byte;
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+typedef unsigned char byte;
 #endif
 
 // Constants matching the Java server
@@ -23,7 +23,8 @@ const int SERVER_PORT = 2222;
 const int MAX_MESSAGE_SIZE = 1024;
 
 // Operation types matching OperationType.java
-enum OperationType {
+enum OperationType
+{
     QUERY_AVAILABILITY = 1,
     BOOK_FACILITY = 2,
     CHANGE_BOOKING = 3,
@@ -33,7 +34,8 @@ enum OperationType {
 };
 
 // Day of week enum matching Java's DayOfWeek
-enum DayOfWeek {
+enum DayOfWeek
+{
     MONDAY = 1,
     TUESDAY = 2,
     WEDNESDAY = 3,
@@ -44,14 +46,17 @@ enum DayOfWeek {
 };
 
 // Structure for message header matching MessageHeader.java
-struct MessageHeader {
+struct MessageHeader
+{
     int32_t requestId;
     OperationType operationType;
     int16_t payloadLength;
+    uint8_t simulateLoss;
 };
 
 // Structure for date/time representation
-struct DateTime {
+struct DateTime
+{
     DayOfWeek dayOfWeek;
     int hour;
     int minute;

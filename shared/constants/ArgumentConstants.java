@@ -2,7 +2,6 @@ package shared.constants;
 
 public class ArgumentConstants {
     public static final String PORT = "-port";
-    public static final String LOSS = "-loss";
     public static final String SEMANTICS = "-semantics";
 
     public enum Semantics {
