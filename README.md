@@ -24,10 +24,11 @@ Communication is via UDP sockets. The server learns the client’s address on re
   The system uses UDP sockets rather than TCP, so all message marshalling and unmarshalling is implemented manually.
 
 - **Marshalling:**  
-  Custom message formats are designed with a 7-byte header containing:
+  Custom message formats are designed with a 8-byte header containing:
   - Request ID (4 bytes)
   - Operation type (1 byte)
-  - Payload length (2 bytes)  
+  - Payload length (2 bytes)
+  - Simulate Loss Byte (1 byte)
   The payload carries variable-length data (e.g., facility names), where each string is prefixed with its length.
 
 - **Fault Tolerance:**  
@@ -35,7 +36,7 @@ Communication is via UDP sockets. The server learns the client’s address on re
   - Implementing timeouts and retry mechanisms.
   - Filtering duplicate requests via a maintained history.
   - Caching replies to support at-least-once invocation semantics.
-  - Simulating packet loss via a configurable probability.
+  - Simulating packet loss via providing additional arguments in user input.
 
 ### 3.2 System Description
 
@@ -71,7 +72,7 @@ The system implements the following services:
   - ALO detects duplicates and resends cached replies.
 
 - **Simulated Packet Loss:**  
-  Both client and server simulate packet loss using a configurable probability to test fault tolerance.
+  Both client and server simulate packet loss via simulate loss byte in header to test fault tolerance.
 
 ## 4. Project Structure
 
@@ -81,7 +82,9 @@ The system implements the following services:
 |   run_server.sh
 |
 +---client
-|       BookingClient.cpp
+|   |   BookingClient.cpp
+|   |   Marshaller.cpp
+|   |   Marshaller.h
 |
 +---server
 |   |   Availability.java
@@ -99,8 +102,6 @@ The system implements the following services:
 |           FacilityBookingException.java
 |
 \---shared
-    |   Marshaller.cpp
-    |   Marshaller.h
     |   Marshaller.java
     |   MessageHeader.java
     |
@@ -120,7 +121,7 @@ Use `compile.sh` to compile all Java files. A sample `compile.sh` might look lik
 ```bash
 #!/bin/bash
 mkdir -p bin
-javac -d bin client/*.java server/*.java shared/*.java
+javac -d bin server/*.java shared/*.java shared/constants/*.java
 ```
 
 ### 5.2 Switching Between Semantics
@@ -222,6 +223,18 @@ At the client prompt, enter commands as follows:
 
 - **Exit:**  
   `exit`
+
+To simulate client packet loss, add the following to the end of any command:
+- `-client-simulate-loss`
+
+If using At-Least-Once, client will simulate packet loss on first attempt to send message.
+If using At-Most-Once, client will not send the message.
+
+To simulate server packet loss, add the following to the end of any command:
+- `-server-simulate-loss`
+
+If using At-Least-Once, server will not reply the first client request but it will cache the reply. On subsequent requests, server will retrieve reply from cache and send it to client. If cache misses, server will reprocess request.
+If using At-Most-Once, server will not send any message.
 
 ## 7. Experimental Results & Observations
 
